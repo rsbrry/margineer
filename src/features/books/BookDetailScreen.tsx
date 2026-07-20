@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { updateBookProgress, updateBookStatus } from './booksApi';
 import { Book, BookStatus } from './types';
 
-export default function BookDetailScreen({ route }: any) {
+export default function BookDetailScreen({ route, navigation }: any) {
   const { bookId } = route.params;
 
   const [book, setBook] = useState<Book | null>(null);
@@ -149,6 +149,13 @@ export default function BookDetailScreen({ route }: any) {
           </View>
         </>
       )}
+
+      <Pressable
+        className="bg-gray-200 rounded-lg p-3 items-center mb-6"
+        onPress={() => navigation.navigate('NotesList', { bookId: book.id })}
+      >
+        <Text className="text-gray-800 font-semibold">View Notes</Text>
+      </Pressable>
 
       {error && <Text className="text-red-500 mt-2">{error}</Text>}
     </View>
