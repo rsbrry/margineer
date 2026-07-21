@@ -157,6 +157,13 @@ export default function BookDetailScreen({ route, navigation }: any) {
         <Text className="text-gray-800 font-semibold">View Notes</Text>
       </Pressable>
 
+      <Pressable
+        className="bg-gray-200 rounded-lg p-3 items-center mb-6"
+        onPress={() => navigation.navigate('OCRCapture', { bookId: book.id })}
+      >
+        <Text className="text-gray-800 font-semibold">Scan Page</Text>
+      </Pressable>
+
       {error && <Text className="text-red-500 mt-2">{error}</Text>}
     </View>
   );

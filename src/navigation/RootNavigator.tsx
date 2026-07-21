@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../features/auth/LoginScreen';
 import SignupScreen from '../features/auth/SignupScreen';
 import BooksNavigator from './BooksNavigator';
+import VocabularyNavigator from './VocabularyNavigator';
 
 const AuthStack = createNativeStackNavigator();
 const MainTabs = createBottomTabNavigator();
@@ -23,7 +24,7 @@ function MainNavigator() {
   return (
     <MainTabs.Navigator screenOptions={{ headerShown: false }}>
       <MainTabs.Screen name="Books" component={BooksNavigator} />
-      {/* Notes and Vocabulary tabs will be added in Phases 3 and 5 */}
+      <MainTabs.Screen name="Vocabulary" component={VocabularyNavigator} />
     </MainTabs.Navigator>
   );
 }

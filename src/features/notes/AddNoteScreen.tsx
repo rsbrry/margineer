@@ -10,10 +10,10 @@ const typeOptions: { value: NoteType; label: string }[] = [
 ];
 
 export default function AddNoteScreen({ route, navigation }: any) {
-  const { bookId } = route.params;
+  const { bookId, prefillContent } = route.params;
 
-  const [type, setType] = useState<NoteType>('note');
-  const [content, setContent] = useState('');
+  const [type, setType] = useState<NoteType>(prefillContent ? 'quote' : 'note');
+  const [content, setContent] = useState(prefillContent ?? '');
   const [pageNumber, setPageNumber] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [error, setError] = useState<string | null>(null);
