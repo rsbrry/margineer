@@ -1,22 +1,39 @@
-// Days until next review, indexed by mastery_level. Higher mastery ->
-// longer gap before the word reappears in a quiz. This array's length
-// also defines the maximum mastery_level (index 8 = capped).
-const INTERVAL_DAYS = [0, 1, 2, 4, 7, 14, 30, 60, 120];
+// Spaced-repetition intervals in days, indexed by mastery_level.
+// mastery_level 0 -> reviewed again tomorrow; higher mastery -> longer gaps.
+const INTERVAL_DAYS = [1, 1, 2, 2, 3, 3, 4, 7, 10, 14, 30, 60, 90, 120];
 const MAX_MASTERY = INTERVAL_DAYS.length - 1;
 
-export function nextReviewFromMastery(masteryLevel: number): { nextQuizDate: string } {
-  const clamped = Math.max(0, Math.min(masteryLevel, MAX_MASTERY));
-  const days = INTERVAL_DAYS[clamped];
+// Midnight (00:00:00.000 local time), N days from today, as an ISO string.
+// Storing only midnight timestamps means "due today" is a simple <= check
+// against today's midnight, with no time-of-day edge cases.
+function midnightPlusDays(days: number): string {
   const date = new Date();
+  date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() + days);
-  return { nextQuizDate: date.toISOString() };
+  return date.toISOString();
 }
 
-export function applyQuizResult(currentMastery: number, correct: boolean) {
+export function todayMidnightISO(): string {
+  return midnightPlusDays(0);
+}
+
+export function tomorrowMidnightISO(): string {
+  return midnightPlusDays(1);
+}
+
+export function msUntilMidnight(): number {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  return midnight.getTime() - now.getTime();
+}
+
+// Only called for Daily Quiz answers -- Practice Quiz never touches this.
+export function applyDailyQuizResult(currentMastery: number, correct: boolean) {
   const newMastery = correct
     ? Math.min(currentMastery + 1, MAX_MASTERY)
     : Math.max(currentMastery - 1, 0);
 
-  const { nextQuizDate } = nextReviewFromMastery(newMastery);
-  return { newMastery, nextQuizDate };
+  const nextDailyQuiz = midnightPlusDays(INTERVAL_DAYS[newMastery]);
+  return { newMastery, nextDailyQuiz };
 }

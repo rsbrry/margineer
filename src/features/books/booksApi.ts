@@ -71,3 +71,14 @@ export async function updateBookStatus(
   if (error) throw new Error(error.message);
   return data as Book;
 }
+
+export async function getBookById(bookId: string): Promise<Book> {
+  const { data, error } = await supabase
+    .from('books')
+    .select('*')
+    .eq('id', bookId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as Book;
+}

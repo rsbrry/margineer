@@ -1,9 +1,10 @@
 import { supabase } from '../../lib/supabase';
-import { VocabularyWord } from './types';
-import { applyQuizResult } from './srs';
+import { VocabularyWord, VocabularyWordWithBook } from './types';
+import { applyDailyQuizResult, todayMidnightISO, tomorrowMidnightISO } from './srs';
 
 export interface NewVocabWordInput {
   book_id: string | null;
+  page_number: number | null;
   word: string;
   definition: string | null;
   context_sentence: string | null;
@@ -20,7 +21,7 @@ export async function createVocabWord(input: NewVocabWordInput): Promise<Vocabul
     .insert({
       ...input,
       user_id: userData.user.id,
-      next_quiz_date: new Date().toISOString(),
+      next_daily_quiz: tomorrowMidnightISO(),
       mastery_level: 0,
       excluded_from_quiz: false,
     })
@@ -41,20 +42,32 @@ export async function getAllVocabWords(): Promise<VocabularyWord[]> {
   return data as VocabularyWord[];
 }
 
-// Words due for review right now, excluding any the user has
-// permanently opted out of. Capped at 20 per session so a huge
-// backlog doesn't turn into an unbounded quiz.
-export async function getDueQuizWords(): Promise<VocabularyWord[]> {
+// Words due today (or overdue), not permanently excluded. Whether
+// this list is empty is exactly what decides Daily vs Practice mode --
+// no separate "already did today" flag is needed, since answering a
+// word during a Daily Quiz pushes its next_daily_quiz into the future.
+export async function getDailyDueWords(): Promise<VocabularyWordWithBook[]> {
   const { data, error } = await supabase
     .from('vocabulary')
-    .select('*')
+    .select('*, books(title)')
     .eq('excluded_from_quiz', false)
-    .lte('next_quiz_date', new Date().toISOString())
-    .order('next_quiz_date', { ascending: true })
-    .limit(20);
+    .lte('next_daily_quiz', todayMidnightISO())
+    .order('next_daily_quiz', { ascending: true });
 
   if (error) throw new Error(error.message);
-  return data as VocabularyWord[];
+  return data as unknown as VocabularyWordWithBook[];
+}
+
+// Practice pool: any non-excluded word regardless of schedule, since
+// Practice Quiz never reads or writes next_daily_quiz.
+export async function getPracticeWordPool(): Promise<VocabularyWordWithBook[]> {
+  const { data, error } = await supabase
+    .from('vocabulary')
+    .select('*, books(title)')
+    .eq('excluded_from_quiz', false);
+
+  if (error) throw new Error(error.message);
+  return data as unknown as VocabularyWordWithBook[];
 }
 
 export async function setExcludedFromQuiz(
@@ -72,18 +85,18 @@ export async function setExcludedFromQuiz(
   return data as VocabularyWord;
 }
 
-// Records a quiz answer: computes the new mastery_level + next_quiz_date
-// via the SRS logic, then persists both in one update.
-export async function recordQuizResult(
+// The only place mastery_level / next_daily_quiz change -- called
+// exclusively from Daily Quiz answers, never from Practice Quiz.
+export async function recordDailyQuizResult(
   wordId: string,
   currentMastery: number,
   correct: boolean
 ): Promise<VocabularyWord> {
-  const { newMastery, nextQuizDate } = applyQuizResult(currentMastery, correct);
+  const { newMastery, nextDailyQuiz } = applyDailyQuizResult(currentMastery, correct);
 
   const { data, error } = await supabase
     .from('vocabulary')
-    .update({ mastery_level: newMastery, next_quiz_date: nextQuizDate })
+    .update({ mastery_level: newMastery, next_daily_quiz: nextDailyQuiz })
     .eq('id', wordId)
     .select()
     .single();
