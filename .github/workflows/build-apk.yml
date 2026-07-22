@@ -1,0 +1,49 @@
+name: Build and Release APK
+
+# 1. When does the robot run? 
+# Answer: Whenever you publish a new "Release" on GitHub.
+on:
+  release:
+    types: [published]
+
+# 2. What are the robot's tasks?
+jobs:
+  build-android:
+    # Give the robot an Ubuntu Linux computer to work on
+    runs-on: ubuntu-latest 
+
+    steps:
+      # Step A: Download your React Native code from GitHub
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step B: Install Node.js (The Translator Engine)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # Step C: Install Java (Required for Android development)
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # Step D: Install your "Plugins" (NPM packages)
+      - name: Install NPM Dependencies
+        run: npm install
+
+      # Step E: "Unpack" your Expo code into a real Android project folder
+      - name: Generate Android Folder (Prebuild)
+        run: npx expo prebuild --platform android
+
+      # Step F: Run the Android Factory to spit out an APK
+      - name: Build the APK
+        run: cd android && ./gradlew assembleDebug
+
+      # Step G: Take the finished APK and attach it to your GitHub Release!
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/debug/app-debug.apk
