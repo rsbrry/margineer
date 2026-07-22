@@ -6,6 +6,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 # 2. What are the robot's tasks?
 jobs:
   build-android:
