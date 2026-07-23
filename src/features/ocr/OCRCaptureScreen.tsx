@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { extractTextFromImage } from './visionApi';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
 
 export default function OCRCaptureScreen({ route, navigation }: any) {
   const { bookId } = route.params;
@@ -17,22 +17,22 @@ export default function OCRCaptureScreen({ route, navigation }: any) {
     setError(null);
 
     try {
-      // quality 0.5 keeps the base64 payload smaller -- Vision API
-      // still reads text fine at this resolution and it uploads faster.
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
-      if (!photo?.base64) {
+      // base64 is no longer needed -- ML Kit reads the image straight
+      // from its file URI on-device, no upload/encoding step required.
+      const photo = await cameraRef.current.takePictureAsync();
+      if (!photo?.uri) {
         throw new Error('Failed to capture image.');
       }
 
-      const text = await extractTextFromImage(photo.base64);
+      const result = await TextRecognition.recognize(photo.uri);
       setCapturing(false);
 
-      if (!text) {
+      if (!result.text) {
         setError('No text found. Try again with better lighting or focus.');
         return;
       }
 
-      navigation.navigate('TextSelection', { bookId, extractedText: text });
+      navigation.navigate('TextSelection', { bookId, extractedText: result.text });
     } catch (err) {
       console.log('OCR capture error:', err);
       setCapturing(false);
