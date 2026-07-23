@@ -33,7 +33,7 @@
           "cameraPermission": "Allow Margineer to access your camera to scan book barcodes and pages."
         }
       ],
-      "@react-native-ml-kit/text-recognition"
+      "expo-mlkit-ocr"
     ],
     "extra": {
       "eas": {

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { isSupported, recognizeText } from 'expo-mlkit-ocr';
 
 export default function OCRCaptureScreen({ route, navigation }: any) {
   const { bookId } = route.params;
@@ -11,20 +11,28 @@ export default function OCRCaptureScreen({ route, navigation }: any) {
   const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (!isSupported()) {
+    return (
+      <View className="flex-1 justify-center items-center p-6">
+        <Text className="text-center">
+          On-device text scanning isn't supported on this device.
+        </Text>
+      </View>
+    );
+  }
+
   async function handleCapture() {
     if (!cameraRef.current) return;
     setCapturing(true);
     setError(null);
 
     try {
-      // base64 is no longer needed -- ML Kit reads the image straight
-      // from its file URI on-device, no upload/encoding step required.
       const photo = await cameraRef.current.takePictureAsync();
       if (!photo?.uri) {
         throw new Error('Failed to capture image.');
       }
 
-      const result = await TextRecognition.recognize(photo.uri);
+      const result = await recognizeText(photo.uri);
       setCapturing(false);
 
       if (!result.text) {
