@@ -1,109 +1,184 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 
+function splitIntoSentences(text: string): string[] {
+  const matches = text.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g);
+  if (!matches) return [text.trim()].filter(Boolean);
+  return matches.map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+function splitIntoWords(text: string): string[] {
+  return text.split(/\s+/).filter((w) => w.length > 0);
+}
+
+function cleanWord(word: string): string {
+  return word.replace(/^[^a-zA-Z']+|[^a-zA-Z']+$/g, '');
+}
+
+type Step = 'sentences' | 'confirm' | 'word';
+
 export default function TextSelectionScreen({ route, navigation }: any) {
   const { bookId, extractedText } = route.params;
 
-  // Split on whitespace while KEEPING the whitespace as its own tokens
-  // (the capturing parens in the regex do this), so we can rejoin a
-  // selected range later without losing the original spacing.
-  const tokens: string[] = extractedText.split(/(\s+)/);
+  const [sentences] = useState(() => splitIntoSentences(extractedText));
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [step, setStep] = useState<Step>('sentences');
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
-  const [selStart, setSelStart] = useState<number | null>(null);
-  const [selEnd, setSelEnd] = useState<number | null>(null);
+  const orderedSelected = [...selectedIndices].sort((a, b) => a - b);
+  const selectedSentenceText = orderedSelected.map((i) => sentences[i]).join(' ');
 
-  function handleWordPress(index: number) {
-    if (selStart === null) {
-      setSelStart(index);
-      setSelEnd(index);
-    } else if (selStart === index && selEnd === index) {
-      // Tapping the only selected word again clears the selection.
-      setSelStart(null);
-      setSelEnd(null);
-    } else {
-      setSelEnd(index);
-    }
+  function toggleSentence(index: number) {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
   }
 
-  const rangeStart = selStart !== null && selEnd !== null ? Math.min(selStart, selEnd) : null;
-  const rangeEnd = selStart !== null && selEnd !== null ? Math.max(selStart, selEnd) : null;
-  const hasSelection = rangeStart !== null && rangeEnd !== null;
-  const isSingleWord = hasSelection && rangeStart === rangeEnd;
-
-  const selectedText = hasSelection
-    ? tokens.slice(rangeStart as number, (rangeEnd as number) + 1).join('').trim()
-    : '';
-
   function handleSaveAsNote() {
-    navigation.navigate('AddNote', { bookId, prefillContent: selectedText });
+    navigation.navigate('AddNote', { bookId, prefillContent: selectedSentenceText });
+  }
+
+  function handleWordTap(word: string) {
+    const cleaned = cleanWord(word);
+    // Tapping the already-selected word again clears the selection,
+    // same "toggle off" behavior as the sentence list.
+    setSelectedWord((prev) => (prev === word ? null : word));
   }
 
   function handleSaveAsWord() {
-    // Real sentence-boundary detection is out of scope for now, so we
-    // pass the whole captured block as context and let the vocab
-    // screen (and Phase 5's quiz cards) show it as-is.
+    if (!selectedWord) return;
     navigation.navigate('AddVocabWord', {
       bookId,
-      word: selectedText,
-      contextSentence: extractedText,
+      word: cleanWord(selectedWord),
+      contextSentence: selectedSentenceText,
     });
   }
+
+  // ---- Step 1: select sentences ----
+  if (step === 'sentences') {
+    const hasSelection = selectedIndices.size > 0;
+
+    return (
+      <View className="flex-1">
+        <ScrollView className="flex-1 p-4">
+          <Text className="text-sm text-gray-500 mb-4">
+            Tap the sentences you want to save. You can select more than one.
+          </Text>
+          {sentences.map((sentence, index) => {
+            const isSelected = selectedIndices.has(index);
+            return (
+              <Pressable
+                key={index}
+                onPress={() => toggleSentence(index)}
+                className={`p-3 rounded-lg mb-2 border ${
+                  isSelected ? 'bg-blue-100 border-blue-500' : 'bg-white border-gray-200'
+                }`}
+              >
+                <Text className="text-gray-800">{sentence}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View className="p-4 border-t border-gray-200 bg-white">
+          <Pressable
+            className={`rounded-lg p-3.5 items-center ${hasSelection ? 'bg-blue-600' : 'bg-gray-300'}`}
+            onPress={() => hasSelection && setStep('confirm')}
+            disabled={!hasSelection}
+          >
+            <Text className={hasSelection ? 'text-white font-semibold' : 'text-gray-500 font-semibold'}>
+              Next
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // ---- Step 2: confirm selected sentences, choose destination ----
+  if (step === 'confirm') {
+    return (
+      <View className="flex-1">
+        <ScrollView className="flex-1 p-4">
+          <Pressable onPress={() => setStep('sentences')} className="mb-4">
+            <Text className="text-blue-600">{'< Back to selection'}</Text>
+          </Pressable>
+
+          <Text className="text-sm text-gray-500 mb-3">Selected text:</Text>
+          {orderedSelected.map((index) => (
+            <View key={index} className="bg-blue-50 rounded-lg p-3 mb-2 border border-blue-200">
+              <Text className="text-gray-800">{sentences[index]}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        <View className="p-4 border-t border-gray-200 bg-white gap-2">
+          <Pressable
+            className="bg-blue-600 rounded-lg p-3.5 items-center"
+            onPress={handleSaveAsNote}
+          >
+            <Text className="text-white font-semibold">Save as Note/Quote</Text>
+          </Pressable>
+          <Pressable
+            className="bg-gray-200 rounded-lg p-3.5 items-center"
+            onPress={() => setStep('word')}
+          >
+            <Text className="text-gray-800 font-semibold">Select Vocab Word</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // ---- Step 3: pick a single word from the selected sentences ----
+  const words = splitIntoWords(selectedSentenceText);
 
   return (
     <View className="flex-1">
       <ScrollView className="flex-1 p-4">
-        <Text className="text-sm text-gray-500 mb-4">
-          Tap a word to start a selection, tap another word to extend the range. Tap the same
-          single word again to clear.
-        </Text>
-        <Text className="leading-7">
-          {tokens.map((token, index) => {
-            if (/^\s+$/.test(token)) {
-              return <Text key={index}>{token}</Text>;
-            }
+        <Pressable onPress={() => setStep('confirm')} className="mb-4">
+          <Text className="text-blue-600">{'< Back'}</Text>
+        </Pressable>
 
-            const isSelected =
-              hasSelection && index >= (rangeStart as number) && index <= (rangeEnd as number);
+        <Text className="text-sm text-gray-500 mb-4">Tap the word you want to save.</Text>
 
+        <View className="flex-row flex-wrap gap-2">
+          {words.map((word, index) => {
+            const isSelected = selectedWord === word;
             return (
-              <Text
-                key={index}
-                onPress={() => handleWordPress(index)}
-                className={isSelected ? 'bg-blue-200' : ''}
+              <Pressable
+                key={`${word}-${index}`}
+                onPress={() => handleWordTap(word)}
+                className={`px-3 py-2 rounded-lg border ${
+                  isSelected ? 'bg-blue-100 border-blue-500' : 'bg-white border-gray-200'
+                }`}
               >
-                {token}
-              </Text>
+                <Text className="text-gray-800">{word}</Text>
+              </Pressable>
             );
           })}
-        </Text>
+        </View>
       </ScrollView>
 
-      {hasSelection && (
-        <View className="p-4 border-t border-gray-200 bg-white">
-          <Text className="text-xs text-gray-500 mb-2" numberOfLines={2}>
-            Selected: {selectedText}
+      <View className="p-4 border-t border-gray-200 bg-white">
+        <Pressable
+          className={`rounded-lg p-3.5 items-center ${
+            selectedWord ? 'bg-green-600' : 'bg-gray-300'
+          }`}
+          onPress={handleSaveAsWord}
+          disabled={!selectedWord}
+        >
+          <Text className={selectedWord ? 'text-white font-semibold' : 'text-gray-500 font-semibold'}>
+            Save as Vocab Word
           </Text>
-          <View className="flex-row gap-2">
-            <Pressable
-              className="flex-1 bg-blue-600 rounded-lg p-3 items-center"
-              onPress={handleSaveAsNote}
-            >
-              <Text className="text-white font-semibold">Save as Note/Quote</Text>
-            </Pressable>
-            <Pressable
-              className={`flex-1 rounded-lg p-3 items-center ${
-                isSingleWord ? 'bg-green-600' : 'bg-gray-300'
-              }`}
-              onPress={handleSaveAsWord}
-              disabled={!isSingleWord}
-            >
-              <Text className={isSingleWord ? 'text-white font-semibold' : 'text-gray-500'}>
-                Save as Vocab Word
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
+        </Pressable>
+      </View>
     </View>
   );
 }
