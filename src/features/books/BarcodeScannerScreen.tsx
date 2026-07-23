@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
-import { lookupBookByIsbn } from './googleBooksApi';
+import { lookupBookByIsbn } from './bookLookupApi';
 
 export default function BarcodeScannerScreen({ navigation }: any) {
   const [permission, requestPermission] = useCameraPermissions();
