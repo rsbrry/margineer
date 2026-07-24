@@ -88,7 +88,7 @@ export default function QuizScreen({ route, navigation }: any) {
         setRevealed(false);
         setHintExpanded(false);
         setIndex((i) => i + 1);
-      }, 2000);
+      }, 1000);
     } catch (err: any) {
       setError(err.message ?? 'Failed to save your answer.');
     }
